@@ -1,59 +1,87 @@
+
 <?php
 session_start();
 
-// DIPERBAIKI: Menggunakan !isset dan nama fungsi yang benar
+// 1. Cek apakah pengguna sudah login
 if (!isset($_SESSION['login'])) {
     header("Location: login.php");
     exit;
 }
 
-// Mengambil data dari form
-$nama = $_POST['nama'] ?? '';
-$kelas = $_POST['kelas'] ?? '';
-$tanggal = $_POST['tanggal'] ?? '';
-$status = $_POST['status'] ?? '';
-// DIPERBAIKI: Mengubah $_['keterangan'] menjadi $_POST['keterangan']
+// 2. Mengambil data dari form
+$nama       = $_POST['nama'] ?? '';
+$kelas      = $_POST['kelas'] ?? '';
+$tanggal    = $_POST['tanggal'] ?? '';
+$status     = $_POST['status'] ?? '';
 $keterangan = $_POST['keterangan'] ?? '';
-$no_hp = $_POST['no_hp_ortu'] ??'';
+$no_hp      = $_POST['no_hp_ortu'] ?? '';
 
-// Membersihkan data
-$nama = trim($nama);
-$kelas = trim($kelas);
+// 3. Membersihkan data
+$nama       = trim($nama);
+$kelas      = trim($kelas);
+$tanggal    = trim($tanggal);
+$status     = trim($status);
 $keterangan = trim($keterangan);
+$no_hp      = trim($no_hp);
+
+// 4. Validasi data
+if ($nama == '' || $kelas == '' || $tanggal == '' || $status == '') {
+    die("Data belum lengkap! Silakan kembali dan lengkapi form.");
+}
 
 // Jika keterangan kosong
-if ($keterangan == "") {
-    $keterangan = "-";
+if ($keterangan == '') {
+    $keterangan = '-';
 }
 
-// Membuat format data
-$data = 
-    $tanggal . "|" .
-    $nama . "|" .
-    $kelas . "|" .
-    $status . "|" .
-    $keterangan . PHP_EOL; // Perhatikan: PHP_EOL sudah otomatis membuat baris baru, jadi tidak perlu tanda "|" di ujung sebelum PHP_EOL agar tidak membuat kolom kosong ekstra.
+// 5. Membuat format data
+$data = $tanggal . "|" .
+        $nama . "|" .
+        $kelas . "|" .
+        $status . "|" .
+        $keterangan . PHP_EOL;
 
-// Pastikan folder 'data' ada
-if (!is_dir('data')) {
-    mkdir('data', 0777, true);
+// 6. Membuat folder data jika belum ada
+$folder = __DIR__ . '/data';
+
+if (!is_dir($folder)) {
+    mkdir($folder, 0777, true);
 }
 
-// Menyimpan data
-file_put_contents(
-    "data/absensi.txt",
+// 7. Menyimpan data absensi
+$file = $folder . '/absensi.txt';
+
+$hasil = file_put_contents(
+    $file,
     $data,
-    FILE_APPEND
+    FILE_APPEND | LOCK_EX
 );
-// 48. KODINGAN NOTIFIKASI ORTU - TARO DISINI
-if ($status == 'Alpa' || $status == 'Sakit' || $status == 'Izin') {
-    $hp_wa = preg_replace('/^0/', '62', $no_hp);
-    $pesan = "INFO: Ananda $nama kelas $kelas tgl $tanggal status $status - $keterangan";
-    $_SESSION['link_wa'] = "https://wa.me/$hp_wa?text=" . urlencode($pesan);
-    $_SESSION['nama_wa'] = $nama;
+
+// 8. Mengecek apakah data berhasil disimpan
+if ($hasil === false) {
+    die("Gagal menyimpan data absensi!");
 }
 
-// Kembali ke data absensi (DIPERBAIKI: success menggunakan double 's')
+// 9. Membuat notifikasi WhatsApp orang tua
+if ($status == 'Alpa' || $status == 'Sakit' || $status == 'Izin') {
+
+    if ($no_hp != '') {
+
+        // Mengubah 08 menjadi 628
+        $hp_wa = preg_replace('/^0/', '62', $no_hp);
+
+        // Menghapus karakter selain angka
+        $hp_wa = preg_replace('/[^0-9]/', '', $hp_wa);
+
+        $pesan = "INFO: Ananda $nama kelas $kelas tanggal $tanggal status $status - $keterangan";
+
+        $_SESSION['link_wa'] = "https://wa.me/" . $hp_wa . "?text=" . urlencode($pesan);
+
+        $_SESSION['nama_wa'] = $nama;
+    }
+}
+
+// 10. Kembali ke halaman data absensi
 header("Location: data_absensi.php?success=1");
 exit;
 ?>
